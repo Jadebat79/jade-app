@@ -1,70 +1,170 @@
-# Getting Started with Create React App
+# 📝 Serverless Notes App (AWS Amplify + Cognito + AppSync + Lambda + DynamoDB)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This project is a **serverless full-stack notes application** built on AWS.  
+It demonstrates how to combine **React (frontend)** with **Cognito authentication**,  
+**AppSync GraphQL API**, **DynamoDB**, and **Lambda (Python)** functions.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 📌 Architecture Overview
 
-### `npm start`
+The application consists of the following components:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **Frontend**: React app hosted with Amplify Hosting.
+- **Authentication**: Amazon Cognito User Pool + Hosted UI.
+- **API**: AWS AppSync (GraphQL) connected to DynamoDB.
+- **Database**: DynamoDB table storing notes.
+- **Functions**: Lambda triggers (Python) for signup logic.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+![Architecture Diagram](https://docs.amplify.aws/assets/diagrams/serverless-appsync-architecture.png) <!-- (Optional: Replace with your own diagram if you make one) -->
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 🚀 Deployment Requirements
 
-### `npm run build`
+- Node.js ≥ 18
+- AWS CLI configured
+- AWS services used:
+    - Amplify Hosting
+    - Cognito
+    - AppSync
+    - DynamoDB
+    - Lambda (Python)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+---
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 🖥️ Frontend (React + Amplify)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Setup
 
-### `npm run eject`
+```bash
+npx create-react-app notes-app
+cd notes-app
+npm install aws-amplify@^6 @aws-amplify/ui-react@^6
+npm install @aws-amplify/ui@^6
+npm i graphql    
+npm i aws-amplify@^6 @aws-amplify/ui-react@^6 graphql
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Amplify Configuration (src/aws-config.js)
+```javascript
+const awsconfig = {
+  Auth: {
+    region: "us-east-1",
+    userPoolId: "<your-user-pool-id>",
+    userPoolWebClientId: "<your-app-client-id>",
+    oauth: {
+      domain: "<your-cognito-domain>.auth.us-east-1.amazoncognito.com",
+      scope: ["email", "openid", "profile"],
+      redirectSignIn: "http://localhost:3000/,https://<amplify-app-url>.amplifyapp.com/",
+      redirectSignOut: "http://localhost:3000/,https://<amplify-app-url>.amplifyapp.com/",
+      responseType: "code"
+    }
+  },
+  aws_appsync_graphqlEndpoint: "<your-appsync-endpoint>",
+  aws_appsync_region: "us-east-1",
+  aws_appsync_authenticationType: "AMAZON_COGNITO_USER_POOLS"
+};
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+export default awsconfig;
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Features
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- Sign up / Sign in / Sign out (via Cognito Hosted UI)
+- Create a new note
+- List all notes from DynamoDB
 
-## Learn More
+--- 
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 🔐 Authentication (Cognito)
+### Setup
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Created a User Pool in Cognito.
+- Created an App Client (no client secret).
+- Enabled a Cognito Hosted UI domain:
 
-### Code Splitting
+```cpp
+https://<your-domain>.auth.us-east-1.amazoncognito.com
+```
+- Added callback URLs:
+    - http://localhost:3000/
+    - https://<amplify-app-url>.amplifyapp.com/
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Lambda Triggers
 
-### Analyzing the Bundle Size
+- Added PreSignUp and PostConfirmation triggers to the User Pool.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### ⚠️ UI Notes
+- In the **new AWS Console UI**, Lambda triggers are under **“Extensions”**, not directly under **“Triggers”** (older tutorials show “Triggers”).  
+- When setting callback URLs, they are now located in the **App client → Login pages** section, not where older docs suggest.
 
-### Making a Progressive Web App
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## API & Database (AppSync + DynamoDB)
+### GraphQL Schema
 
-### Advanced Configuration
+```graphql
+type Note @model {
+  id: ID!
+  name: String!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+```
+- AppSync connected to a DynamoDB table.
+- CRUD resolvers configured for Note.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### ⚠️ UI Notes
+- AppSync now separates **“Schema”** and **“Resolvers”** in a slightly different way.  
+  - After creating your model, queries/mutations are linked automatically.  
+  - Subscriptions and connections are created, but you may need to manually attach them to the data source if required.
+  
+--- 
 
-### Deployment
+## Lambda Function (Python)
+### Function: onUserSignupPy
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- Runtime: Python 3.12
+- Handler: lambda_function.lambda_handler
 
-### `npm run build` fails to minify
+```python
+def lambda_handler(event, context):
+    # Auto-confirm user + verify email
+    event["response"] = {
+        "autoConfirmUser": True,
+        "autoVerifyEmail": True,
+        "autoVerifyPhone": False
+    }
+    return event
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Attached to PreSignUp in Cognito.
+- Logs monitored in CloudWatch.
+
+---
+
+## Hosting (Amplify Hosting)
+### Steps
+
+- Push code to GitHub.
+- In Amplify Console → “Host Web App” → connect repo & branch.
+- Amplify auto-builds and deploys with npm run build.
+- Live URL provided:
+
+```bash
+https://main.<hash>.amplifyapp.com
+```
+
+- Update Cognito callback/sign-out URLs to include Amplify URL.
+
+--- 
+
+## Final Working Flow
+
+- User signs up (Cognito Hosted UI).
+- PreSignUp Lambda runs → user auto-confirmed.
+- User signs in → redirected to frontend.
+- User creates a note → stored in DynamoDB via AppSync.
+- Notes display in frontend.
+- User can sign out successfully.
